@@ -3,29 +3,167 @@ RFC: RFC0022
 Author: Jody Whitlock
 Status: Draft
 Area: Commands
-Comments Due: 
+Comments Due:
 ---
 
-# Get-TestConnection cmdlet for non-Windows Systems
+# Cross-platform `Test-Connection` cmdlet
 
-Test-Connection, introduced in PowerShell 2.0 under the Microsoft.PowerShell.Management class provided a mechanism for sending ICMP echo requests within the PowerShell language and have the results returned as a PowerShell object that could be manipulated as such.
+`Test-Connection` was introduced in `PowerShell 2.0` under the `Microsoft.PowerShell.Management` class to provide a mechanism for sending `ICMP` echo requests within the PowerShell language and have the results returned as a PowerShell object.
 
-While it's true that Test-Connection has evolved very little over the years and versions of PowerShell, on only need to look at the legacy that this cmdlet builds on, the ping command.  This simple command has mostly remained unchanged for as long as the ICMP protocol has existed.  It's a very simplistic function that while simplistic fills a massive void in network troubleshooting and validation of communication capabilities.
+`Test-Connection` was implemented based on `WMI`, which is not supported on non-Windows platforms. The RFC aims to describe cross-platform `Test-Connection`, which will run on all platforms supported by .Net Core.
+
+Network troubleshooting is not limited to ping. `Test-Connection` must support all the basic network diagnostics - ping, trace route, connection test, pathping (to check a quality of the channel), black hole router and MTU size detections.
 
 ## Motivation
 
-The motivation for this RFC is as simple as the ping command itself; provide a Test-Connection cmdlet that can run on any platform that PowerShell can.  This means stripping out some of the WSMan specific remoting capabilities that have been added to allow for distributed execution and removing WMI based methods and classes in favor of pure C# code.
+PowerShell users need an cross-platform, available and power tool to troubleshoot and diagnose a network.
 
-This could also be back-ported into the Windows implementation, which while immediately removing the remoting capability would increase the performance of the cmdlet by not requiring WMI accessors and allow for tighter integration between multiple platforms that this cmdlet could run on.
-
-It would also serve as a framework for further enhancement, such as using SSHRemoting to enable the distributed approach to performing a distributed ping, while allowing for some built in governor mechanism to prevent abuse of the distributed nature.
-
-Lastly, and most importantly, while the current Test-Connection cmdlet in the Windows invocation of PowerShell is limited, it is used extensively to check for the existence and responsiveness of remote systems.  By not providing a non-Windows specific implementation that is as close in parameter set and return types then existing code must be re-written to overcome this limitation, or adoption of PowerShell on non-Windows platforms may be barred by the lack of this simple but widely used functionality.
+Currently users can use some native utilites such as `nmap`, `ping`, `traceroute`, `pathping`. We want to have a cmdlet that provides most of these capabilities.
 
 ## Specification
 
+### Outputs
+
+- (empty yet)
+
+### Parameter Sets
+
+1. Ping - (1) resolve hostname address and ping IPv6 address or fallback to IPv4 address. (2) detect input address type anf ping IPv6 or IPv4 address.
+
+1. TraceRoute
+
+1. PathPing
+
+1. ConnectionByTCPPortName
+
+1. ConnectionByUDPPortName
+
+1. ConnectionByTCPPort
+
+1. ConnectionByUDPPort
+
+1. DetectionOfBlackHole - detect Black Hole Router. See [Diagnoses and treatment of black hole routers](https://support.microsoft.com/en-us/help/159211/diagnoses-and-treatment-of-black-hole-routers)
+
+1. DetectionOfMTUSize - detect MTU size. See [Recommended TCP/IP settings for WAN links with a MTU size of less than 576](https://support.microsoft.com/en-us/help/900926/recommended-tcp-ip-settings-for-wan-links-with-a-mtu-size-of-less-than)
+
+### Common Parameters
+
+1. InformationalLevel
+
+   - Quiet - return true/false or a single value of the response.
+   - Detailed - return an result object corresponding the parameterset.
+
+1. TimeOut - timeout for each request (not cmdlet).
+    [int]
+    ValidatePositive()
+
+1. ComputerName - hostname(s) or IPv4/IPv6 address(es).
+    [string[]]
+
+### Parameters
+
+1. Ping
+
+    1. IPv4 or IPv6 - force use the protocol.
+
+    1. Resolve - resolve ip addresses to hostnames.
+        [Switch]
+
+    1. Source - source address to use.
+        [IPAddress]
+
+    1. MaxHops - (TTL) maximum number of hops to search target.
+        [int]
+        ValidateRange(1, 30)
+
+    1. Count - number of echo requests to send.
+        [int]
+        ValidatePositive()
+
+    1. Delay - delay in milliseconds between attempts.
+        [int]
+        ValidatePositive()
+
+    1. BufferSize - send buffer size.
+        [int]
+        ValidatePositive()
+
+    1. DontFragment - set Don't Fragment flag for IPv4.
+        [Switch]
+
+    1. Continues - ping until stopped by Ctrl-C.
+        [Switch]
+
+1. TraceRoute
+
+    1. IPv4 or IPv6 - force use the protocol.
+
+    1. Resolve - resolve ip addresses to hostnames.
+        [Switch]
+
+    1. Source - source address to use.
+        [IPAddress]
+
+    1. MaxHops - (TTL) maximum number of hops to search target.
+        [int]
+        ValidateRange(1, 30)
+
+1. PathPing
+
+    1. IPv4 or IPv6 - force use the protocol.
+
+    1. Resolve - resolve ip addresses to hostnames.
+        [Switch]
+
+    1. Source - source address to use.
+        [IPAddress]
+
+    1. MaxHops - (TTL) maximum number of hops to search target.
+        [int]
+        ValidateRange(1, 30)
+
+    1. Delay - delay in milliseconds between attempts.
+        [int]
+        ValidatePositive()
+
+    1. Count - number of echo requests to send per hop.
+        [int]
+        ValidatePositive()
+
+1. ConnectionByTCPPortName
+
+    1. TCPPortName - test connection by the common port name using TCP protocol.
+        [string]
+        ValidateSet()
+
+1. ConnectionByUDPPortName
+
+    1. UDPPortName - test connection by the common port name using UDP protocol.
+        [string]
+        ValidateSet()
+
+1. ConnectionByTCPPort
+
+    1. TCPPort - test connection by the port number using TCP protocol.
+        [uint]
+        ValidateRange()
+
+1. ConnectionByUDPPort
+
+    1. UDPPort - test connection by the port number using UDP protocol.
+        [uint]
+        ValidateRange(1, 65535)
+
+1. DetectionOfBlackHole
+
+    1. BlackHoleDetect
+        [Switch]
+
+1. DetectionOfMTUSize
+
+    1. MTUSizeDetect
+        [Switch]
+
 ## Alternate Proposals and Considerations
 
-An alternate proposal is to not implement Test-Connection but rather build a new cmdlet from the ground up to replace Test-Connection entirely.  This would be similar in impact to not implementing Test-Connection cross-platform by requiring an unknown amount of code changes to occur before adoption on non-Windows platforms can occur.
-
-This may also lend to those that require this functionality to create seperate code-bases and modules to fill the gap, leading to many custom solutions and suffering from the lack of standards and community collaboration.
+Underlying .Net Core may have limitations and bugs so not all features can be implemented or may not work on all platforms. See [Issue](https://github.com/PowerShell/PowerShell/issues/4240).
